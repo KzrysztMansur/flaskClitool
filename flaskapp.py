@@ -10,20 +10,22 @@ THIS IS A SCRIPT TO CREATE PYTHON FLASK-REACT APP TEMPLATES
 class Webapp:
     def __init__(self, project_name):
         self.project_name = project_name
+        self._db = None
 
     def add_auth(self):
         self._auth = True
         return self
 
-    def add_db(self):
+    def add_db(self, db_type):
         self._db = True
+        self.db_type = db_type
         return self
     
     def create(self):
         with open('run.py', 'w') as f:
             f.write(f"""from {self.project_name} import app
 
-if _name_ == '__main__':
+if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
             """)
@@ -31,9 +33,9 @@ if _name_ == '__main__':
         os.mkdir(self.project_name)
         os.chdir(self.project_name)
 
-        if (self._db):
+        if (self.db_type == 'sql'):
 
-            with open('_init_.py', 'w') as f:
+            with open('__init__.py', 'w') as f:
                 f.write(f"""from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
@@ -54,7 +56,7 @@ from .views import *
             with open('models.py', 'w') as f:
                 f.write("""from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
-from . import db  # Assuming db is the SQLAlchemy instance created in _init_.py
+from . import db  # Assuming db is the SQLAlchemy instance created in __init__.py
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -76,10 +78,63 @@ class Post(db.Model):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)       
 
                 """)
+        elif (self.db_type == 'mongo'):
+            with open('__init__.py', 'w') as f:
+                f.write(f"""from flask import Flask
+from flask_pymongo import PyMongo
+
+app = Flask(__name__)
+
+app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['MONGO_URI'] = 'mongodb://localhost:27017/your_database'
+
+mongoDB = PyMongo(app)
+
+from . import mongo_models
+
+from .views import *
+                """)
+            with open('models.py', 'w') as f:
+                f.write("""from flaskapp import mongo
+
+class User:
+    def __init__(self, username, password, email):
+        self.username = username
+        self.password = password
+        self.email = email
+
+    @staticmethod
+    def get_user_by_username(username):
+        return mongo.db.users.find_one({'username': username})
+
+    def save(self):
+        mongo.db.users.insert_one({
+            'username': self.username,
+            'password': self.password,
+            'email': self.email
+        })
+
+class Post:
+    def __init__(self, title, content, user_id):
+        self.title = title
+        self.content = content
+        self.user_id = user_id
+
+    @staticmethod
+    def get_posts_by_user_id(user_id):
+        return mongo.db.posts.find({'user_id': user_id})
+
+    def save(self):
+        mongo.db.posts.insert_one({
+            'title': self.title,
+            'content': self.content,
+            'user_id': self.user_id
+        })
+                """)
 
         else:
             
-            with open('_init_.py', 'w') as f:
+            with open('__init__.py', 'w') as f:
                 f.write(f"""from flask import Flask
 
 app = Flask(__name__)
@@ -90,7 +145,7 @@ from .views import *
         
         with open('views.py', 'w') as f:
             f.write("""from flask import redirect, url_for, render_template, request
-from ._init_ import app
+from .__init__ import app
                         
 @app.route('/', methods=['GET','POST'])
 def home():
@@ -135,11 +190,12 @@ def home():
 
 @click.command()
 @click.option("-name", is_flag=False, flag_value="Flag", default="flaskapp", type=str)
-@click.option('-db', required=False, default= False)
+@click.option('-db', required=False, default= None)
 def main(name, db):
     flaskapp = Webapp(name)
-    if (db):
-        flaskapp.add_db()
+    if (db is not None):
+        flaskapp.add_db(db)
+
 
     flaskapp.create()
 
@@ -147,4 +203,3 @@ def main(name, db):
 
 if __name__ == '__main__':
     main()
-    
