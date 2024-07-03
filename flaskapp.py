@@ -10,51 +10,71 @@ THIS IS A SCRIPT TO CREATE PYTHON FLASK-REACT APP TEMPLATES
 class Webapp:
     def __init__(self, project_name):
         self.project_name = project_name
-        self._db = None
-
-    def add_auth(self):
-        self._auth = True
-        return self
+        self._db = False
 
     def add_db(self, db_type):
         self._db = True
         self.db_type = db_type
         return self
     
+    
     def create(self):
+        self.create_run()
+
+        os.mkdir(self.project_name)
+        os.chdir(self.project_name)
+
+        if (self._db):
+            if (self.db_type == 'sql'):
+                self.create_sql_db_connection()
+            elif (self.db_type == 'mongo'):  
+                self.create_mongo_db_connection()
+            else:
+                raise Exception("not in db list try flaskapp --help to get more info")
+        else:            
+            self.create_no_db_connection()
+
+        self.create_routes()
+
+        os.mkdir("templates")
+        os.chdir("templates")
+
+        with open('index.html', 'w') as f:
+            f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>{{ msg }}</h1>
+</body>
+</html>
+
+            """)
+
+        os.chdir("..")
+        os.mkdir("static")
+
+        os.chdir("..")
+        os.chdir("..")
+
+        click.echo(f"Flask app created at: {os.getcwd()}/{self.project_name}")
+
+
+    def create_run(self):
         with open('run.py', 'w') as f:
             f.write(f"""from {self.project_name} import app
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
-            """)
+                """)
 
-        os.mkdir(self.project_name)
-        os.chdir(self.project_name)
-
-        if (self.db_type == 'sql'):
-
-            with open('__init__.py', 'w') as f:
-                f.write(f"""from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-
-app = Flask(__name__)
-
-app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-                
-from . import models
-
-from .views import *
-
-                """)  
-            
-            with open('models.py', 'w') as f:
-                f.write("""from sqlalchemy import Column, Integer, String, ForeignKey
+    def create_sql_db_connection(self):
+        with open('models.py', 'w') as f:
+            f.write("""from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from . import db  # Assuming db is the SQLAlchemy instance created in __init__.py
 
@@ -78,24 +98,28 @@ class Post(db.Model):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)       
 
                 """)
-        elif (self.db_type == 'mongo'):
-            with open('__init__.py', 'w') as f:
-                f.write(f"""from flask import Flask
-from flask_pymongo import PyMongo
+
+        with open('__init__.py', 'w') as f:
+            f.write(f"""from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['MONGO_URI'] = 'mongodb://localhost:27017/your_database'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-mongoDB = PyMongo(app)
+db = SQLAlchemy(app)
+                
+from . import models
 
-from . import mongo_models
+from .routes import *
 
-from .views import *
-                """)
-            with open('models.py', 'w') as f:
-                f.write("""from flaskapp import mongo
+                """)  
+
+    def create_mongo_db_connection(self):
+        with open('models.py', 'w') as f:
+            f.write("""from flaskapp import mongo
 
 class User:
     def __init__(self, username, password, email):
@@ -132,65 +156,56 @@ class Post:
         })
                 """)
 
-        else:
-            
-            with open('__init__.py', 'w') as f:
-                f.write(f"""from flask import Flask
+        with open('__init__.py', 'w') as f: # Create a __init__.py file with the connection to a mongo db database
+            f.write(f"""from flask import Flask
+from flask_pymongo import PyMongo
 
 app = Flask(__name__)
 
-from .views import *
+app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['MONGO_URI'] = 'mongodb://localhost:27017/your_database'
 
-                """)  
-        
-        with open('views.py', 'w') as f:
+mongoDB = PyMongo(app)
+
+from . import mongo_models
+
+from .routes import *
+                """)
+
+
+    def create_no_db_connection(self): # Create a normal __init__.py with no database connections
+        with open('__init__.py', 'w') as f:
+            f.write(f"""from flask import Flask
+
+app = Flask(__name__)
+
+from .routes import *
+                """)
+
+     
+    def create_routes(self):
+        with open('routes.py', 'w') as f:
             f.write("""from flask import redirect, url_for, render_template, request
 from .__init__ import app
                         
 @app.route('/', methods=['GET','POST'])
 def home():
+    msg = 'App template'
     if request.method=='POST':
         # Handle POST Request here
-        return render_template('index.html')
-        msg = 'data'
+        
+        
         return render_template('index.html', msg=msg)         
 
 
-    return render_template('index.html')         
+    return render_template('index.html', msg=msg)         
 
             """)
-
-
-        os.mkdir("templates")
-        os.chdir("templates")
-
-        with open('index.html', 'w') as f:
-            f.write("""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    {{msg}}
-</body>
-</html>
-
-            """)
-
-        os.chdir("..")
-        os.mkdir("static")
-
-        os.chdir("..")
-        os.chdir("..")
-
-        click.echo(f"Flask app created at: {os.getcwd()}/{self.project_name}")
 
 
 @click.command()
-@click.option("-name", is_flag=False, flag_value="Flag", default="flaskapp", type=str)
-@click.option('-db', required=False, default= None)
+@click.option("-name", is_flag=False, flag_value="Flag", default="app", type=str)
+@click.option('-db', required=False, default= None, type=str)
 def main(name, db):
     flaskapp = Webapp(name)
     if (db is not None):
