@@ -159,17 +159,17 @@ class Post:
         with open('__init__.py', 'w') as f: # Create a __init__.py file with the connection to a mongo db database
             f.write(f"""from flask import Flask
 from flask_pymongo import PyMongo
+from pymongo import MongoClient
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['MONGO_URI'] = 'mongodb://localhost:27017/your_database'
+client = MongoClient("localhost", 27017) #instead of the localhost write your db connection
 
-mongoDB = PyMongo(app)
+db = client.test1
 
-from . import mongo_models
 
 from .routes import *
+                
                 """)
 
 
