@@ -74,11 +74,17 @@ if __name__ == '__main__':
 
     def create_sql_db_connection(self):
         with open('models.py', 'w') as f:
-            f.write("""from sqlalchemy import Column, Integer, String, ForeignKey
+            f.write("""from app import app
+from sqlalchemy import Column, Integer, String, ForeignKey
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 from sqlalchemy.orm import relationship
-from . import db  # Assuming db is the SQLAlchemy instance created in __init__.py
+from flask_bcrypt import Bcrypt
 
-class User(db.Model):
+db = SQLAlchemy()
+bcrypt = Bcrypt(app)
+
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
@@ -89,6 +95,14 @@ class User(db.Model):
     # Relationships
     posts = relationship('Post', backref='author', lazy=True)
 
+    def __init__(self, username, password):
+        self.username = username
+        self.password = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password, password)
+
+
 class Post(db.Model):
     __tablename__ = 'posts'
 
@@ -96,6 +110,12 @@ class Post(db.Model):
     title = Column(String(100), nullable=False)
     content = Column(String(1000), nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)       
+
+    def __init__(self, title, content, user_id):
+        self.name = name
+        self.amount = amount
+        self.arrival_date = arrival_date
+        self.user_id = user_id
 
                 """)
 
@@ -105,16 +125,16 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = ""
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = ''
+app.config['ENV'] = 'production'
 
-db = SQLAlchemy(app)
-                
-from . import models
 
+
+from .models import db
 from .routes import *
-
+                
                 """)  
 
     def create_mongo_db_connection(self):
